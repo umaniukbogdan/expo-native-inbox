@@ -1,50 +1,242 @@
-# Welcome to your Expo app 👋
+# React Native Push Notification Demo
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A comprehensive React Native (Expo) application demonstrating push notification capabilities with background task handling and notification history tracking.
 
-## Get started
+## Features
 
-1. Install dependencies
+### Push Notification Support
+
+- **Foreground Notifications**: Handle notifications when app is active
+- **Background Notifications**: Process notifications when app is minimized
+- **Terminated State**: Capture notifications even when app is fully closed
+- **Deep Linking**: Navigate to specific screens from notifications
+- **Data Payload Handling**: Extract and process custom notification data
+
+### Notification History
+
+- **Persistent Storage**: Save all received notifications locally using AsyncStorage
+- **Read/Unread Status**: Track which notifications have been viewed
+- **Batch Mark as Read**: Mark all notifications as read with one tap
+- **Persistent Across Sessions**: History survives app restarts
+
+### Technical Implementation
+
+- **Expo Router**: File-based routing for navigation
+- **Expo Notifications**: Native notification handling
+- **Expo Task Manager**: Background task execution
+- **AsyncStorage**: Local data persistence
+- **TypeScript**: Full type safety
+- **EAS Build**: Development and production builds
+
+## Tech Stack
+
+- **React Native 0.81.5**
+- **Expo SDK 54**
+- **Expo Router 6.0**
+- **TypeScript 5.9**
+- **EAS Build** for production builds
+
+## Project Structure
+
+```
+├── app/                          # Expo Router pages
+│   ├── (tabs)/                  # Tab navigation
+│   │   ├── index.tsx            # Home screen (notification testing)
+│   │   ├── explore.tsx           # Notification details
+│   │   └── history.tsx          # Notification history (coming soon)
+│   └── _layout.tsx              # Root layout
+├── components/                   # Reusable components
+├── hooks/                        # Custom React hooks
+├── tasks/                        # Background tasks
+│   └── notificationHandler.ts   # Background notification handler
+├── utils/                        # Utility functions
+│   ├── notificationHistory.ts   # History management
+│   └── navigation.ts            # Navigation helpers
+└── types/                        # TypeScript types
+    └── notification.ts           # Notification interfaces
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+ installed
+- Expo CLI installed globally
+- Expo account for EAS Build
+- Physical device or emulator for testing
+
+### Installation
+
+1. Install dependencies:
 
    ```bash
    npm install
    ```
 
-2. Start the app
-
+2. Start the development server:
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+### Development Modes
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+#### Using Expo Go (Limited Functionality)
 
 ```bash
-npm run reset-project
+npx expo start
+# Scan QR code with Expo Go app
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+**Note**: Background tasks and advanced notification features require a development build.
 
-## Learn more
+#### Using Development Build (Full Functionality)
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+# Build development build
+npm run build:dev:android  # For Android
+npm run build:dev:ios      # For iOS
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+# Start dev server
+npx expo start --dev-client
+```
 
-## Join the community
+## Usage
 
-Join our community of developers creating universal apps.
+### Testing Push Notifications
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+1. **Get Push Token**: Open the app and copy the push token from the Home screen
+2. **Send Test Notification**: Use the built-in test button or send via Expo's push service
+3. **Test Scenarios**:
+   - Send notification while app is **active** (foreground)
+   - Send notification while app is **minimized** (background)
+   - Send notification while app is **closed** (terminated)
+   - Open app via notification tap (deep link testing)
+
+### Features
+
+#### Home Screen
+
+- Display Expo push token
+- Show last received notification details
+- Send test notifications
+- Track notification source (active/background/startup)
+
+#### Explore Screen
+
+- View notification details
+- See notification metadata and data payload
+- Navigate from background notifications
+
+#### History Screen (Coming Soon)
+
+- View all received notifications
+- Filter read/unread status
+- Batch mark as read
+- Delete notifications
+
+## Build for Production
+
+```bash
+# Android APK
+eas build --profile development --platform android
+
+# Android App Bundle (for Play Store)
+eas build --profile production --platform android
+
+# iOS
+eas build --profile development --platform ios
+```
+
+## Configuration
+
+### Push Notification Setup
+
+The app uses Expo's push notification service. Configure your `app.json`:
+
+```json
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id"
+      }
+    },
+    "android": {
+      "googleServicesFile": "./google-services.json"
+    }
+  }
+}
+```
+
+### Background Tasks
+
+Background notification handling is configured in:
+
+- `app.json`: Android background task configuration
+- `tasks/notificationHandler.ts`: Background task implementation
+
+## Architecture
+
+### Notification Flow
+
+```
+Push Notification Received
+    ↓
+Foreground? → Active Listener
+Background? → Background Task Handler
+Terminated? → Background Task Handler
+    ↓
+Save to History (AsyncStorage)
+    ↓
+Display in UI
+```
+
+### Data Flow
+
+```
+Notification → notificationHandler.ts
+              ↓
+        Save to AsyncStorage
+              ↓
+        Read by history screen
+              ↓
+        Display in FlatList
+```
+
+## Key Implementation Details
+
+1. **Background Tasks**: Registered via `Notifications.registerTaskAsync()`
+2. **Persistence**: All notifications saved to AsyncStorage
+3. **Navigation**: Deep linking via expo-router
+4. **State Management**: React hooks + AsyncStorage
+5. **Type Safety**: Full TypeScript coverage
+
+## Troubleshooting
+
+### Background Tasks Not Working
+
+- Requires development build (not Expo Go)
+- Check AndroidManifest.xml configuration
+- Verify task is registered on app startup
+
+### Notifications Not Received
+
+- Check device has internet connection
+- Verify push token is valid
+- Ensure permissions are granted
+
+### History Not Persisting
+
+- Check AsyncStorage is working
+- Verify app has storage permissions
+- Look for console errors in debug logs
+
+## License
+
+MIT License - Private project
+
+## Learn More
+
+- [Expo Notifications Documentation](https://docs.expo.dev/versions/latest/sdk/notifications/)
+- [Expo Router Documentation](https://docs.expo.dev/router/introduction/)
+- [EAS Build Documentation](https://docs.expo.dev/build/introduction/)

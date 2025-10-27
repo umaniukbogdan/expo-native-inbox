@@ -1,98 +1,199 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import Constants from "expo-constants";
+import * as Device from "expo-device";
+import * as Notifications from "expo-notifications";
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { Button, Platform, Text, View } from "react-native";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+async function sendPushNotification(expoPushToken: string) {
+  const message = {
+    to: expoPushToken,
+    sound: "default",
+    title: "Original Title",
+    body: "And here is the body!",
+    data: { someData: "goes here" },
+  };
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
-  );
+  await fetch("https://exp.host/--/api/v2/push/send", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Accept-encoding": "gzip, deflate",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(message),
+  });
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
+function handleRegistrationError(errorMessage: string) {
+  alert(errorMessage);
+  throw new Error(errorMessage);
+}
+
+async function registerForPushNotificationsAsync() {
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "default",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#FF231F7C",
+    });
+  }
+
+  if (Device.isDevice) {
+    const { status: existingStatus } =
+      await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== "granted") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== "granted") {
+      handleRegistrationError(
+        "Permission not granted to get push token for push notification!"
+      );
+      return;
+    }
+    const projectId =
+      Constants?.expoConfig?.extra?.eas?.projectId ??
+      Constants?.easConfig?.projectId;
+    if (!projectId) {
+      handleRegistrationError("Project ID not found");
+    }
+    try {
+      const pushTokenString = (
+        await Notifications.getExpoPushTokenAsync({
+          projectId,
+        })
+      ).data;
+      console.log(pushTokenString);
+
+      // Enable background notifications
+      await Notifications.setAutoServerRegistrationEnabledAsync(true);
+
+      return pushTokenString;
+    } catch (e: unknown) {
+      handleRegistrationError(`${e}`);
+    }
+  } else {
+    handleRegistrationError("Must use physical device for push notifications");
+  }
+}
+
+export default function HomeScreen() {
+  const router = useRouter();
+  const [expoPushToken, setExpoPushToken] = useState("");
+  const [notification, setNotification] = useState<
+    Notifications.Notification | undefined
+  >(undefined);
+  const [notificationSource, setNotificationSource] = useState<string>("");
+
+  useEffect(() => {
+    registerForPushNotificationsAsync()
+      .then((token) => {
+        console.log("token : ", token);
+        setExpoPushToken(token ?? "");
+      })
+      .catch((error: any) => {
+        console.log("error : ", error);
+        setExpoPushToken(`${error}`);
+      });
+
+    // Обработка уведомлений когда приложение активно
+    const notificationListener = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        console.log(
+          "notificationListener (app active): ",
+          JSON.stringify(notification, null, 2)
+        );
+        setNotification(notification);
+        setNotificationSource("App Active");
+      }
+    );
+
+    // Обработка нажатий на уведомления (когда приложение в фоне или закрыто)
+    const responseListener =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        console.log(
+          "responseListener (app opened from notification): ",
+          JSON.stringify(response, null, 2)
+        );
+        console.log(
+          "Full notification object:",
+          JSON.stringify(response.notification, null, 2)
+        );
+
+        // Устанавливаем уведомление в состояние для отображения
+        setNotification(response.notification);
+        setNotificationSource("Opened from Background");
+
+        // Навигация на вкладку Explore ТОЛЬКО если приложение было открыто из фона
+        // НЕ навигацию если приложение активно
+        router.push("/(tabs)/explore");
+      });
+
+    // Проверяем, было ли приложение открыто через уведомление при запуске
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        console.log(
+          "App opened from notification on startup: ",
+          JSON.stringify(response, null, 2)
+        );
+        console.log(
+          "Full notification object:",
+          JSON.stringify(response.notification, null, 2)
+        );
+        setNotification(response.notification);
+        setNotificationSource("App Startup");
+
+        // Навигация на вкладку Explore при открытии из фона
+        router.push("/(tabs)/explore");
+      }
+    });
+
+    return () => {
+      notificationListener.remove();
+      responseListener.remove();
+    };
+  }, [router]);
+
+  return (
+    <View
+      style={{ flex: 1, alignItems: "center", justifyContent: "space-around" }}
+    >
+      <Text style={{ color: "red" }}>
+        Your Expo push token: {expoPushToken}
+      </Text>
+      <View style={{ alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ color: "blue", fontSize: 16, fontWeight: "bold" }}>
+          Source: {notificationSource || "No notification"}
+        </Text>
+        <Text style={{ color: "red" }}>
+          Title: {notification && notification.request.content.title}{" "}
+        </Text>
+        <Text style={{ color: "red" }}>
+          Body: {notification && notification.request.content.body}
+        </Text>
+        <Text style={{ color: "red" }}>
+          Data:{" "}
+          {notification && JSON.stringify(notification.request.content.data)}
+        </Text>
+      </View>
+      <Button
+        title="Press to Send Notification"
+        onPress={async () => {
+          await sendPushNotification(expoPushToken);
+        }}
+      />
+    </View>
+  );
+}
