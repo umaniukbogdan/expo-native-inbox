@@ -23,12 +23,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.reactnativepushnotification",
-      "googleServicesFile": "./google-services.json",
-      "background": {
-        "notifications": {
-          "task": "BACKGROUND-NOTIFICATION-TASK"
-        }
-      }
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",

@@ -5,13 +5,29 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Button, Platform, Text, View } from "react-native";
 
+console.log("📄 index.tsx file loaded - notifications handled by Kotlin only");
+
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async (notification) => {
+    console.log("==========================================");
+    console.log("📱 setNotificationHandler CALLED (Foreground handler)");
+    console.log("==========================================");
+    console.log("Notification:", JSON.stringify(notification, null, 2));
+    console.log("Title:", notification.request.content.title);
+    console.log("Body:", notification.request.content.body);
+    console.log(
+      "Data:",
+      JSON.stringify(notification.request.content.data, null, 2)
+    );
+    console.log("==========================================");
+
+    return {
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    };
+  },
 });
 
 async function sendPushNotification(expoPushToken: string) {
@@ -90,6 +106,8 @@ async function registerForPushNotificationsAsync() {
 }
 
 export default function HomeScreen() {
+  console.log("🎬 HomeScreen component rendered");
+
   const router = useRouter();
   const [expoPushToken, setExpoPushToken] = useState("");
   const [notification, setNotification] = useState<
@@ -98,48 +116,73 @@ export default function HomeScreen() {
   const [notificationSource, setNotificationSource] = useState<string>("");
 
   useEffect(() => {
+    console.log(
+      "🚀 HomeScreen useEffect started - setting up notification listeners"
+    );
+
     registerForPushNotificationsAsync()
       .then((token) => {
-        console.log("token : ", token);
+        console.log("✅ Push token received:", token);
         setExpoPushToken(token ?? "");
       })
       .catch((error: any) => {
-        console.log("error : ", error);
-        setExpoPushToken(`${error}`);
+        console.error("❌ Error getting push token:", error);
+        // setExpoPushToken(`${error}`);
       });
 
-    // Обработка уведомлений когда приложение активно
+    // Обработка уведомлений когда приложение активно (foreground)
+    console.log("🔔 Registering notification listener...");
     const notificationListener = Notifications.addNotificationReceivedListener(
       (notification) => {
+        console.log("==========================================");
+        console.log("🔔 NOTIFICATION RECEIVED (Foreground/Active)");
+        console.log("==========================================");
         console.log(
-          "notificationListener (app active): ",
+          "Full notification object:",
           JSON.stringify(notification, null, 2)
         );
+        console.log("Title:", notification.request.content.title);
+        console.log("Body:", notification.request.content.body);
+        console.log(
+          "Data:",
+          JSON.stringify(notification.request.content.data, null, 2)
+        );
+        console.log("==========================================");
+
         setNotification(notification);
         setNotificationSource("App Active");
       }
     );
+    console.log("✅ Notification listener registered");
 
-    // Обработка нажатий на уведомления (когда приложение в фоне или закрыто)
+    // Обработка нажатий на уведомления (когда пользователь тапает на пуш)
+    console.log(
+      "👆 Registering notification response listener (tap handler)..."
+    );
     const responseListener =
       Notifications.addNotificationResponseReceivedListener((response) => {
-        console.log(
-          "responseListener (app opened from notification): ",
-          JSON.stringify(response, null, 2)
-        );
+        console.log("==========================================");
+        console.log("👆 NOTIFICATION TAPPED (User clicked on notification)");
+        console.log("==========================================");
+        console.log("Action identifier:", response.actionIdentifier);
+        console.log("Full response object:", JSON.stringify(response, null, 2));
         console.log(
           "Full notification object:",
           JSON.stringify(response.notification, null, 2)
         );
+        console.log("Title:", response.notification.request.content.title);
+        console.log("Body:", response.notification.request.content.body);
+        console.log(
+          "Data:",
+          JSON.stringify(response.notification.request.content.data, null, 2)
+        );
+        console.log("==========================================");
 
         // Устанавливаем уведомление в состояние для отображения
         setNotification(response.notification);
         setNotificationSource("Opened from Background");
-
-        // Навигация на вкладку Explore ТОЛЬКО если приложение было открыто из фона
-        // НЕ навигацию если приложение активно
-        router.push("/(tabs)/explore");
       });
+    console.log("✅ Notification response listener registered");
 
     // Проверяем, было ли приложение открыто через уведомление при запуске
     Notifications.getLastNotificationResponseAsync().then((response) => {
@@ -154,15 +197,14 @@ export default function HomeScreen() {
         );
         setNotification(response.notification);
         setNotificationSource("App Startup");
-
-        // Навигация на вкладку Explore при открытии из фона
-        router.push("/(tabs)/explore");
       }
     });
 
     return () => {
+      console.log("🧹 Cleaning up notification listeners...");
       notificationListener.remove();
       responseListener.remove();
+      console.log("✅ Notification listeners cleaned up");
     };
   }, [router]);
 

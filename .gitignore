@@ -40,4 +40,13 @@ app-example
 
 # generated native folders
 /ios
-/android
+
+# keep android sources under version control, ignore only build artifacts
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/app/.cxx/
+/android/app/src/main/assets/
+/android/app/src/debug/
+/android/app/src/androidTest/
+/android/local.properties

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "483663239967",
+    "project_id": "react-native-8a0d6",
+    "storage_bucket": "react-native-8a0d6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:483663239967:android:f526d2e870d44ef7432e2a",
+        "android_client_info": {
+          "package_name": "com.reactnativepushnotification"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBd6Q91RuxnsBf1lHGwJLPjcykIS_-zbGw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
