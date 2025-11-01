@@ -32,6 +32,45 @@ class NotificationHistoryModule(reactContext: ReactApplicationContext) : ReactCo
     }
 
     /**
+     * Получить последнее уведомление из SharedPreferences
+     * Это данные последнего push-уведомления, сохраненные в NotificationMessagingService
+     * 
+     * Возвращает JSON объект с полями:
+     * - title: заголовок уведомления
+     * - body: текст уведомления
+     * - timestamp: время получения (мс)
+     * - data: объект с данными из push (если были)
+     * 
+     * Если уведомлений не было, возвращает null
+     */
+    @ReactMethod
+    fun getLastNotification(promise: Promise) {
+        try {
+            val prefs: SharedPreferences = reactApplicationContext.getSharedPreferences("notification_data_prefs", Context.MODE_PRIVATE)
+            val lastNotificationJson = prefs.getString("last_notification", null)
+            promise.resolve(lastNotificationJson)
+        } catch (e: Exception) {
+            promise.reject("ERROR", "Failed to get last notification", e)
+        }
+    }
+    
+    /**
+     * Очистить последнее уведомление (после обработки)
+     */
+    @ReactMethod
+    fun clearLastNotification(promise: Promise) {
+        try {
+            val prefs: SharedPreferences = reactApplicationContext.getSharedPreferences("notification_data_prefs", Context.MODE_PRIVATE)
+            prefs.edit()
+                .remove("last_notification")
+                .apply()
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("ERROR", "Failed to clear last notification", e)
+        }
+    }
+
+    /**
      * Отметить уведомление как прочитанное
      */
     @ReactMethod

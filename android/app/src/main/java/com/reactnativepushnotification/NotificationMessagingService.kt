@@ -1,11 +1,11 @@
 package com.reactnativepushnotification
 
-import android.content.Context
-import android.content.SharedPreferences
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.Context
+import android.content.SharedPreferences
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -19,10 +19,16 @@ class NotificationMessagingService : FirebaseMessagingService() {
 
     private val processedMessageIds = ConcurrentHashMap.newKeySet<String>()
 
+    companion object {
+        private const val DEFAULT_CHANNEL_ID = "default_channel"
+        private const val DEFAULT_CHANNEL_NAME = "Notification"
+        private const val DEFAULT_CHANNEL_DESCRIPTION = "Application's Notification"
+    }
+
+    private var defaultChannelCreated = false
+
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
-        // НЕ вызываем super.onMessageReceived() чтобы Firebase ВСЕГДА вызывал этот метод
-        android.util.Log.d("NotificationService", "✅✅✅ onMessageReceived")
         handleRemoteMessage(remoteMessage, "onMessageReceived")
     }
 
@@ -30,95 +36,102 @@ class NotificationMessagingService : FirebaseMessagingService() {
     private fun handleRemoteMessage(remoteMessage: RemoteMessage, source: String) {
         val messageId = remoteMessage.messageId ?: "${remoteMessage.sentTime}_${remoteMessage.data.hashCode()}"
         if (!processedMessageIds.add(messageId)) {
-            android.util.Log.w("NotificationService", "⚠️ Duplicate message skipped (source=$source, id=$messageId)")
             return
         }
+        val bodyJsonString = remoteMessage.data?.get("body") ?: ""
+        var rawTitle = remoteMessage.data?.get("title") ?: ""
+        var rawBody = ""
 
-        android.util.Log.d("NotificationService", "========== handleRemoteMessage ($source) ==========")
-
-        val hasNotification = remoteMessage.notification != null
-        val hasData = remoteMessage.data.isNotEmpty()
-
-        android.util.Log.d("NotificationService", "📬 Message type:")
-        android.util.Log.d("NotificationService", "   - Has notification: $hasNotification")
-        android.util.Log.d("NotificationService", "   - Has data: $hasData")
-        android.util.Log.d("NotificationService", "   - Message type: ${if (hasNotification && hasData) "Both" else if (hasNotification) "Notification-only" else "Data-only"}")
-
-        if (hasNotification && !hasData) {
-            android.util.Log.w("NotificationService", "⚠️ Notification-only message detected. Firebase may auto-display it when app is backgrounded")
+        try {
+            val bodyJson = JSONObject(bodyJsonString)
+            rawTitle = bodyJson.optString("title", "")
+            rawBody = bodyJson.optString("body", "")
+        } catch (e: Exception) {
+            rawBody = bodyJsonString
         }
 
-        android.util.Log.d("NotificationService", "Message ID: ${remoteMessage.messageId}")
-        android.util.Log.d("NotificationService", "From: ${remoteMessage.from}")
-
-        val title = remoteMessage.notification?.title ?: ""
-        val body = remoteMessage.notification?.body ?: ""
         val data = remoteMessage.data
 
-        android.util.Log.d("NotificationService", "Title: $title")
-        android.util.Log.d("NotificationService", "Body: $body")
-        android.util.Log.d("NotificationService", "Data: $data")
 
-        saveNotificationToHistory(title, body, data)
+        // if (rawTitle.isNotEmpty() || rawBody.isNotEmpty() || data.isNotEmpty()) {
+        //   saveNotificationToHistory(rawTitle, rawBody, data)
+        // }
 
-        // Показываем уведомление только если у него есть текст.
-        if (title.isNotEmpty() || body.isNotEmpty()) {
-            showNotification(title, body)
+
+        if (rawTitle.isNotEmpty() || rawBody.isNotEmpty()) {
+            showNotification(rawTitle, rawBody, data)
+        } else {
+            android.util.Log.w("NotificationService", "⚠️ Skipped notification display because both title and body are empty after resolution")
         }
-
-        android.util.Log.d("NotificationService", "========== handleRemoteMessage completed ($source) ==========")
     }
 
-    private fun showNotification(title: String, body: String) {
-        val channelId = "default_channel"
+    private fun showNotification(title: String, body: String, data: Map<String, String>) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        // Создаем канал для Android 8.0+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "Default Channel",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Default Notification Channel"
-            }
-            notificationManager.createNotificationChannel(channel)
-        }
-
-        // Intent для открытия приложения
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        }
+        ensureDefaultChannelExists(notificationManager)
+        val intent = buildNotificationIntent()
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_IMMUTABLE
+            this,
+            0,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        // Создаем уведомление
-        val notificationBuilder = NotificationCompat.Builder(this, channelId)
+        val notificationBuilder = NotificationCompat.Builder(this, DEFAULT_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
 
-        notificationManager.notify(System.currentTimeMillis().toInt(), notificationBuilder.build())
-
-        android.util.Log.d("NotificationService", "📱 Showing notification: $title")
+        val notificationId = data["notification_id"]?.toIntOrNull() ?: System.currentTimeMillis().toInt()
+        notificationManager.notify(notificationId, notificationBuilder.build())
     }
 
 
+    private fun ensureDefaultChannelExists(notificationManager: NotificationManager) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return
+        }
+        if (defaultChannelCreated) {
+            return
+        }
+
+        val existingChannel = notificationManager.getNotificationChannel(DEFAULT_CHANNEL_ID)
+        if (existingChannel != null) {
+            defaultChannelCreated = true
+            return
+        }
+
+        val channel = NotificationChannel(
+            DEFAULT_CHANNEL_ID,
+            DEFAULT_CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = DEFAULT_CHANNEL_DESCRIPTION
+            enableVibration(true)
+            enableLights(true)
+        }
+
+        notificationManager.createNotificationChannel(channel)
+        defaultChannelCreated = true
+    }
+
+
+    private fun buildNotificationIntent(): Intent {
+        return Intent(this@NotificationMessagingService, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+    }
+
     private fun saveNotificationToHistory(title: String, body: String, data: Map<String, String>) {
         try {
-            // Используем SharedPreferences для хранения истории уведомлений
             val prefs: SharedPreferences = getSharedPreferences("notification_history_prefs", Context.MODE_PRIVATE)
 
-            // Читаем существующую историю
             val historyJson = prefs.getString("notification_history", "[]")
             val historyArray = JSONArray(historyJson)
 
-            // Создаем новое уведомление
             val notification = JSONObject().apply {
                 put("id", System.currentTimeMillis().toString())
                 put("title", title)
@@ -130,20 +143,15 @@ class NotificationMessagingService : FirebaseMessagingService() {
                 }
             }
 
-            // Добавляем в начало массива
             val newHistoryArray = JSONArray()
             newHistoryArray.put(notification)
             for (i in 0 until historyArray.length()) {
                 newHistoryArray.put(historyArray[i])
             }
 
-            // Сохраняем в SharedPreferences
             prefs.edit()
                 .putString("notification_history", newHistoryArray.toString())
                 .apply()
-
-            android.util.Log.d("NotificationService", "✅ Saved notification to history: $title")
-            android.util.Log.d("NotificationService", "📊 Total notifications in history: ${newHistoryArray.length()}")
         } catch (e: Exception) {
             android.util.Log.e("NotificationService", "❌ Error saving notification", e)
         }
