@@ -3,7 +3,8 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Button, Platform, Text, View } from "react-native";
+import { Button, Platform, ScrollView, Text, View } from "react-native";
+import { getNotificationHistory } from "../../utils/notificationHistory";
 
 console.log("📄 index.tsx file loaded - notifications handled by Kotlin only");
 
@@ -114,6 +115,7 @@ export default function HomeScreen() {
     Notifications.Notification | undefined
   >(undefined);
   const [notificationSource, setNotificationSource] = useState<string>("");
+  const [notificationHistory, setNotificationHistory] = useState<any[]>([]);
 
   useEffect(() => {
     console.log(
@@ -129,6 +131,19 @@ export default function HomeScreen() {
         console.error("❌ Error getting push token:", error);
         // setExpoPushToken(`${error}`);
       });
+
+    // Загружаем историю уведомлений из SharedPreferences
+    const loadNotificationHistory = async () => {
+      try {
+        const history = await getNotificationHistory();
+        console.log("📚 Notification history loaded : ", history);
+        setNotificationHistory(history);
+      } catch (error) {
+        console.error("❌ Error loading notification history:", error);
+      }
+    };
+
+    loadNotificationHistory();
 
     // Обработка уведомлений когда приложение активно (foreground)
     console.log("🔔 Registering notification listener...");
@@ -230,12 +245,55 @@ export default function HomeScreen() {
           {notification && JSON.stringify(notification.request.content.data)}
         </Text>
       </View>
-      <Button
-        title="Press to Send Notification"
-        onPress={async () => {
-          await sendPushNotification(expoPushToken);
-        }}
-      />
+      <View style={{ gap: 10 }}>
+        <Button
+          title="Press to Send Notification"
+          onPress={async () => {
+            await sendPushNotification(expoPushToken);
+          }}
+        />
+        <Button
+          title="Load Notification History"
+          onPress={async () => {
+            const history = await getNotificationHistory();
+            console.log("📚 History:", history);
+            setNotificationHistory(history);
+            alert(`Loaded ${history.length} notifications`);
+          }}
+        />
+      </View>
+      {notificationHistory.length > 0 && (
+        <ScrollView
+          style={{
+            marginTop: 20,
+            padding: 10,
+            maxHeight: 300,
+            borderWidth: 1,
+            borderColor: "#ccc",
+          }}
+        >
+          <Text style={{ fontWeight: "bold", marginBottom: 5 }}>
+            Notification History ({notificationHistory.length}):
+          </Text>
+          {notificationHistory.map((item, index) => (
+            <View
+              key={index}
+              style={{
+                marginBottom: 10,
+                padding: 5,
+                backgroundColor: "#f0f0f0",
+              }}
+            >
+              <Text style={{ fontWeight: "bold", fontSize: 12 }}>
+                #{index + 1}
+              </Text>
+              <Text style={{ fontSize: 11 }}>
+                {JSON.stringify(item, null, 2)}
+              </Text>
+            </View>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 }

@@ -6,10 +6,8 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.Promise
-import com.facebook.react.bridge.ReadableMap
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.Date
 
 class NotificationHistoryModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
@@ -17,9 +15,6 @@ class NotificationHistoryModule(reactContext: ReactApplicationContext) : ReactCo
         return "NotificationHistoryModule"
     }
 
-    /**
-     * Получить историю уведомлений из SharedPreferences
-     */
     @ReactMethod
     fun getNotificationHistory(promise: Promise) {
         try {
@@ -31,142 +26,24 @@ class NotificationHistoryModule(reactContext: ReactApplicationContext) : ReactCo
         }
     }
 
-    /**
-     * Получить последнее уведомление из SharedPreferences
-     * Это данные последнего push-уведомления, сохраненные в NotificationMessagingService
-     * 
-     * Возвращает JSON объект с полями:
-     * - title: заголовок уведомления
-     * - body: текст уведомления
-     * - timestamp: время получения (мс)
-     * - data: объект с данными из push (если были)
-     * 
-     * Если уведомлений не было, возвращает null
-     */
-    @ReactMethod
-    fun getLastNotification(promise: Promise) {
-        try {
-            val prefs: SharedPreferences = reactApplicationContext.getSharedPreferences("notification_data_prefs", Context.MODE_PRIVATE)
-            val lastNotificationJson = prefs.getString("last_notification", null)
-            promise.resolve(lastNotificationJson)
-        } catch (e: Exception) {
-            promise.reject("ERROR", "Failed to get last notification", e)
-        }
-    }
-    
-    /**
-     * Очистить последнее уведомление (после обработки)
-     */
-    @ReactMethod
-    fun clearLastNotification(promise: Promise) {
-        try {
-            val prefs: SharedPreferences = reactApplicationContext.getSharedPreferences("notification_data_prefs", Context.MODE_PRIVATE)
-            prefs.edit()
-                .remove("last_notification")
-                .apply()
-            promise.resolve(null)
-        } catch (e: Exception) {
-            promise.reject("ERROR", "Failed to clear last notification", e)
-        }
-    }
+    companion object {
+        fun saveNotificationToHistory(context: Context, data: Map<String, String>) {
+            try {
+                val prefs: SharedPreferences = context.getSharedPreferences("notification_history_prefs", Context.MODE_PRIVATE)
 
-    /**
-     * Отметить уведомление как прочитанное
-     */
-    @ReactMethod
-    fun markNotificationAsRead(id: String, promise: Promise) {
-        try {
-            val prefs: SharedPreferences = reactApplicationContext.getSharedPreferences("notification_history_prefs", Context.MODE_PRIVATE)
-            val historyJson = prefs.getString("notification_history", "[]")
-            val historyArray = JSONArray(historyJson)
-            
-            // Обновляем isRead в массиве
-            for (i in 0 until historyArray.length()) {
-                val item = historyArray.getJSONObject(i)
-                if (item.getString("id") == id) {
-                    item.put("isRead", true)
-                    break
-                }
+                val historyJson = prefs.getString("notification_history", "[]")
+                val historyArray = JSONArray(historyJson)
+
+                // Конвертируем data Map в JSONObject
+                val dataJson = JSONObject(data as Map<*, *>)
+                historyArray.put(0, dataJson)
+
+                prefs.edit()
+                    .putString("notification_history", historyArray.toString())
+                    .apply()
+            } catch (e: Exception) {
+                android.util.Log.e("NotificationHistoryModule", "❌ Error saving notification", e)
             }
-            
-            prefs.edit()
-                .putString("notification_history", historyArray.toString())
-                .apply()
-            
-            promise.resolve(null)
-        } catch (e: Exception) {
-            promise.reject("ERROR", "Failed to mark as read", e)
-        }
-    }
-
-    /**
-     * Отметить все как прочитанные
-     */
-    @ReactMethod
-    fun markAllAsRead(promise: Promise) {
-        try {
-            val prefs: SharedPreferences = reactApplicationContext.getSharedPreferences("notification_history_prefs", Context.MODE_PRIVATE)
-            val historyJson = prefs.getString("notification_history", "[]")
-            val historyArray = JSONArray(historyJson)
-            
-            // Обновляем все isRead
-            for (i in 0 until historyArray.length()) {
-                historyArray.getJSONObject(i).put("isRead", true)
-            }
-            
-            prefs.edit()
-                .putString("notification_history", historyArray.toString())
-                .apply()
-            
-            promise.resolve(null)
-        } catch (e: Exception) {
-            promise.reject("ERROR", "Failed to mark all as read", e)
-        }
-    }
-
-    /**
-     * Сохранить уведомление в историю из JS
-     */
-    @ReactMethod
-    fun saveNotification(title: String, body: String, dataJson: String, promise: Promise) {
-        try {
-            val prefs: SharedPreferences = reactApplicationContext.getSharedPreferences("notification_history_prefs", Context.MODE_PRIVATE)
-            
-            // Читаем существующую историю
-            val historyJson = prefs.getString("notification_history", "[]")
-            val historyArray = JSONArray(historyJson)
-
-            // Создаем новое уведомление
-            val notification = JSONObject().apply {
-                put("id", System.currentTimeMillis().toString())
-                put("title", title)
-                put("body", body)
-                put("date", Date().time)
-                put("isRead", false)
-                if (dataJson.isNotEmpty()) {
-                    put("data", JSONObject(dataJson))
-                }
-            }
-
-            // Добавляем в начало массива
-            val newHistoryArray = JSONArray()
-            newHistoryArray.put(notification)
-            for (i in 0 until historyArray.length()) {
-                newHistoryArray.put(historyArray[i])
-            }
-
-            // Сохраняем в SharedPreferences
-            prefs.edit()
-                .putString("notification_history", newHistoryArray.toString())
-                .apply()
-
-            android.util.Log.d("NotificationHistoryModule", "✅ Saved notification from JS: $title")
-            android.util.Log.d("NotificationHistoryModule", "📊 Total notifications in history: ${newHistoryArray.length()}")
-            
-            promise.resolve(null)
-        } catch (e: Exception) {
-            android.util.Log.e("NotificationHistoryModule", "❌ Error saving notification", e)
-            promise.reject("ERROR", "Failed to save notification", e)
         }
     }
 }

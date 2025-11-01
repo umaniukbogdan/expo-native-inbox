@@ -12,7 +12,6 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
 
 class NotificationMessagingService : FirebaseMessagingService() {
@@ -52,10 +51,10 @@ class NotificationMessagingService : FirebaseMessagingService() {
 
         val data = remoteMessage.data
 
-
-        // if (rawTitle.isNotEmpty() || rawBody.isNotEmpty() || data.isNotEmpty()) {
-        //   saveNotificationToHistory(rawTitle, rawBody, data)
-        // }
+        // Сохраняем весь remoteMessage.data в историю
+        if (data != null && data.isNotEmpty()) {
+            NotificationHistoryModule.saveNotificationToHistory(this, data)
+        }
 
 
         if (rawTitle.isNotEmpty() || rawBody.isNotEmpty()) {
@@ -124,39 +123,6 @@ class NotificationMessagingService : FirebaseMessagingService() {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
     }
-
-    private fun saveNotificationToHistory(title: String, body: String, data: Map<String, String>) {
-        try {
-            val prefs: SharedPreferences = getSharedPreferences("notification_history_prefs", Context.MODE_PRIVATE)
-
-            val historyJson = prefs.getString("notification_history", "[]")
-            val historyArray = JSONArray(historyJson)
-
-            val notification = JSONObject().apply {
-                put("id", System.currentTimeMillis().toString())
-                put("title", title)
-                put("body", body)
-                put("date", Date().time)
-                put("isRead", false)
-                if (data.isNotEmpty()) {
-                    put("data", JSONObject(data as Map<*, *>))
-                }
-            }
-
-            val newHistoryArray = JSONArray()
-            newHistoryArray.put(notification)
-            for (i in 0 until historyArray.length()) {
-                newHistoryArray.put(historyArray[i])
-            }
-
-            prefs.edit()
-                .putString("notification_history", newHistoryArray.toString())
-                .apply()
-        } catch (e: Exception) {
-            android.util.Log.e("NotificationService", "❌ Error saving notification", e)
-        }
-    }
-
 }
 
 
