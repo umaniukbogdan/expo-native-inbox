@@ -1,6 +1,20 @@
 # React Native Push Notification Demo
 
-A comprehensive React Native (Expo) application demonstrating push notification capabilities with background task handling and notification history tracking.
+A comprehensive React Native (Expo) application demonstrating push notification capabilities with background task handling and notification history tracking. Organized as a monorepo with shared UI components and Storybook.
+
+## Monorepo Structure
+
+This project is organized as a monorepo using npm workspaces:
+
+```
+react-native-push-notification/
+├── packages/
+│   └── ui/                    # Shared UI package with components
+├── apps/
+│   ├── app/                   # Main application
+│   └── storybook/             # Storybook for component documentation
+└── package.json               # Root workspace configuration
+```
 
 ## Features
 
@@ -35,6 +49,7 @@ A comprehensive React Native (Expo) application demonstrating push notification 
 
 ## Project Structure
 
+### Main Application (`apps/app/`)
 ```
 ├── app/                          # Expo Router pages
 │   ├── (tabs)/                  # Tab navigation
@@ -53,6 +68,12 @@ A comprehensive React Native (Expo) application demonstrating push notification 
     └── notification.ts           # Notification interfaces
 ```
 
+### UI Package (`packages/ui/`)
+Shared UI components, themes, hooks, and utilities used across the monorepo.
+
+### Storybook (`apps/storybook/`)
+Component documentation and testing environment. Currently includes Typography component stories covering all variants.
+
 ## Getting Started
 
 ### Prerequisites
@@ -63,14 +84,24 @@ A comprehensive React Native (Expo) application demonstrating push notification 
 
 ### Installation
 
-1. Install dependencies:
+1. Install dependencies (from root):
    ```bash
    npm install
    ```
+   This will install all dependencies for all workspace projects.
 
-2. Start the development server:
+2. Start the main application:
    ```bash
-   npx expo start
+   npm run app:start
+   # or
+   cd apps/app && npm start
+   ```
+
+3. Start Storybook:
+   ```bash
+   npm run storybook:start
+   # or
+   cd apps/storybook && npm start
    ```
 
 ### Development Modes
@@ -218,8 +249,39 @@ Notification → notificationHandler.ts
 
 MIT License - Private project
 
+## Storybook
+
+Storybook is available to view and test UI components. To run:
+
+```bash
+npm run storybook:start
+# Then select the storybook app in Expo
+```
+
+### Available Stories
+
+- **Typography**: Comprehensive coverage of all typography variants
+  - All variant types (head14, head16, text12, caption10, etc.)
+  - Text alignment examples (left, center, right, justify)
+  - Text transform (uppercase, lowercase, capitalize)
+  - Custom colors and palette colors
+  - Grouped by category (Headings, BodyText, Captions, Headers)
+
+## Workspace Packages
+
+### @react-native-push-notification/ui
+
+Shared UI package containing all components, themes, hooks, and utilities.
+
+Import in your apps:
+```typescript
+import { Typography } from '@react-native-push-notification/ui';
+import { theme } from '@react-native-push-notification/ui/theme';
+```
+
 ## Learn More
 
 - [Expo Notifications Documentation](https://docs.expo.dev/versions/latest/sdk/notifications/)
 - [Expo Router Documentation](https://docs.expo.dev/router/introduction/)
 - [EAS Build Documentation](https://docs.expo.dev/build/introduction/)
+- [Storybook for React Native](https://storybook.js.org/docs/react-native/get-started/introduction)
